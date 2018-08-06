@@ -63,25 +63,33 @@ class ImprovedPerlin {
     }
 
     static dotProduct(hash, x, y, z) {
-        switch (hash & 0xF) {
-            case 0x0: return  x + y;
-            case 0x1: return -x + y;
-            case 0x2: return  x - y;
-            case 0x3: return -x - y;
-            case 0x4: return  x + z;
-            case 0x5: return -x + z;
-            case 0x6: return  x - z;
-            case 0x7: return -x - z;
-            case 0x8: return  y + z;
-            case 0x9: return -y + z;
-            case 0xA: return  y - z;
-            case 0xB: return -y - z;
-            case 0xC: return  y + x;
-            case 0xD: return -y + z;
-            case 0xE: return  y - x;
-            case 0xF: return -y - z;
-            default: return 0; // never happens
-        }
+        hash &= 0xF;
+        const u = (hash < 8) ? x : y;
+        const v = (hash < 4) ? y : ((hash === 12 || hash === 14) ? x : z);
+        return ((hash & 1) === 0 ? u : -u) + ((hash & 2) === 0 ? v : -v);
+
+        // code from https://riven8192.blogspot.com/2010/08/calculate-perlinnoise-twice-as-fast.html
+        // this is way slower in Chrome - I'm talking 100x slower! Ken's original code runs in 2ms against more than 200ms here
+        //
+        // switch (hash & 0xF) {
+        //     case 0x0: return  x + y;
+        //     case 0x1: return -x + y;
+        //     case 0x2: return  x - y;
+        //     case 0x3: return -x - y;
+        //     case 0x4: return  x + z;
+        //     case 0x5: return -x + z;
+        //     case 0x6: return  x - z;
+        //     case 0x7: return -x - z;
+        //     case 0x8: return  y + z;
+        //     case 0x9: return -y + z;
+        //     case 0xA: return  y - z;
+        //     case 0xB: return -y - z;
+        //     case 0xC: return  y + x;
+        //     case 0xD: return -y + z;
+        //     case 0xE: return  y - x;
+        //     case 0xF: return -y - z;
+        //     default: return 0; // never happens
+        // }
     }
 }
 
