@@ -50,7 +50,7 @@ class App {
             for (let j = 0; j < this.canvas.height; j++) {
                 x = i / 256;  // to avoid integer coordinates, which would generate uniform noise
                 y = j / 256;  //
-                const noise = FractalImprovedPerlin.noise3d(x, y, 0, 6, 0.5);
+                const noise = FractalImprovedPerlin.noise2d(x, y, 6, 0.5);
 
                 const bi = 4 * (this.canvas.width * j + i);
                 buffer[bi    ] = 0;

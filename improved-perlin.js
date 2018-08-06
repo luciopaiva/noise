@@ -4,6 +4,36 @@
  */
 class ImprovedPerlin {
 
+    static noise2d(x, y) {
+        const floorX = Math.floor(x);
+        const floorY = Math.floor(y);
+
+        // get unit cube coordinate
+        const xi = floorX & 255;
+        const yi = floorY & 255;
+
+        // local intra-cube coordinates
+        const xf = x - floorX;
+        const yf = y - floorY;
+
+        // smooth intra-cube position
+        const u = ImprovedPerlin.smooth(xf);
+        const v = ImprovedPerlin.smooth(yf);
+
+        // obtain gradients
+        const aaa = ImprovedPerlin.hash(xi,     yi,     0);
+        const aba = ImprovedPerlin.hash(xi,     yi + 1, 0);
+        const baa = ImprovedPerlin.hash(xi + 1, yi,     0);
+        const bba = ImprovedPerlin.hash(xi + 1, yi + 1, 0);
+
+        const lerp = ImprovedPerlin.lerp;
+        const dot = ImprovedPerlin.dotProduct;
+
+        const x1 = lerp(dot(aaa, xf, yf, 0), dot(baa, xf-1, yf, 0), u);
+        const x2 = lerp(dot(aba, xf, yf-1, 0), dot(bba, xf-1, yf-1, 0), u);
+        return (lerp(x1, x2, v) + 1) / 2;  // map from [-1, 1[ to [0, 1[
+    }
+
     static noise3d(x, y, z) {
         const floorX = Math.floor(x);
         const floorY = Math.floor(y);
