@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Noise</title>
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: monospace;
+            color: white;
+        }
+        #canvas {
+            width: 100vw;
+            height: 100vh;
+        }
+        #hourglass {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 72px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="hourglass" class="hidden">&#x231b;</div>
+
+<canvas id="canvas"></canvas>
+
+<script src="lcg.js"></script>
+<script src="improved-perlin.js"></script>
+<script src="fractal-improved-perlin.js"></script>
+<script src="index.js"></script>
+
+</body>
+</html>
