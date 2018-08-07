@@ -4,9 +4,13 @@
  */
 class ImprovedPerlin {
 
+    static floor(n) {
+        return n | 0;
+    }
+
     static noise2d(x, y) {
-        const floorX = Math.floor(x);
-        const floorY = Math.floor(y);
+        const floorX = ImprovedPerlin.floor(x);
+        const floorY = ImprovedPerlin.floor(y);
 
         // get unit cube coordinate
         const xi = floorX & 255;
@@ -21,23 +25,23 @@ class ImprovedPerlin {
         const v = ImprovedPerlin.smooth(yf);
 
         // obtain gradients
-        const aaa = ImprovedPerlin.hash(xi,     yi,     0);
-        const aba = ImprovedPerlin.hash(xi,     yi + 1, 0);
-        const baa = ImprovedPerlin.hash(xi + 1, yi,     0);
-        const bba = ImprovedPerlin.hash(xi + 1, yi + 1, 0);
+        const aa = ImprovedPerlin.hash2d(xi,     yi,     0);
+        const ab = ImprovedPerlin.hash2d(xi,     yi + 1, 0);
+        const ba = ImprovedPerlin.hash2d(xi + 1, yi,     0);
+        const bb = ImprovedPerlin.hash2d(xi + 1, yi + 1, 0);
 
         const lerp = ImprovedPerlin.lerp;
         const dot = ImprovedPerlin.dotProduct;
 
-        const x1 = lerp(dot(aaa, xf, yf, 0), dot(baa, xf-1, yf, 0), u);
-        const x2 = lerp(dot(aba, xf, yf-1, 0), dot(bba, xf-1, yf-1, 0), u);
+        const x1 = lerp(dot(aa, xf, yf, 0), dot(ba, xf-1, yf, 0), u);
+        const x2 = lerp(dot(ab, xf, yf-1, 0), dot(bb, xf-1, yf-1, 0), u);
         return (lerp(x1, x2, v) + 1) / 2;  // map from [-1, 1[ to [0, 1[
     }
 
     static noise3d(x, y, z) {
-        const floorX = Math.floor(x);
-        const floorY = Math.floor(y);
-        const floorZ = Math.floor(z);
+        const floorX = ImprovedPerlin.floor(x);
+        const floorY = ImprovedPerlin.floor(y);
+        const floorZ = ImprovedPerlin.floor(z);
 
         // get unit cube coordinate
         const xi = floorX & 255;
@@ -55,14 +59,14 @@ class ImprovedPerlin {
         const w = ImprovedPerlin.smooth(zf);
 
         // obtain gradients
-        const aaa = ImprovedPerlin.hash(xi,     yi,     zi    );
-        const aba = ImprovedPerlin.hash(xi,     yi + 1, zi    );
-        const aab = ImprovedPerlin.hash(xi,     yi,     zi + 1);
-        const abb = ImprovedPerlin.hash(xi,     yi + 1, zi + 1);
-        const baa = ImprovedPerlin.hash(xi + 1, yi,     zi    );
-        const bba = ImprovedPerlin.hash(xi + 1, yi + 1, zi    );
-        const bab = ImprovedPerlin.hash(xi + 1, yi,     zi + 1);
-        const bbb = ImprovedPerlin.hash(xi + 1, yi + 1, zi + 1);
+        const aaa = ImprovedPerlin.hash3d(xi,     yi,     zi    );
+        const aba = ImprovedPerlin.hash3d(xi,     yi + 1, zi    );
+        const aab = ImprovedPerlin.hash3d(xi,     yi,     zi + 1);
+        const abb = ImprovedPerlin.hash3d(xi,     yi + 1, zi + 1);
+        const baa = ImprovedPerlin.hash3d(xi + 1, yi,     zi    );
+        const bba = ImprovedPerlin.hash3d(xi + 1, yi + 1, zi    );
+        const bab = ImprovedPerlin.hash3d(xi + 1, yi,     zi + 1);
+        const bbb = ImprovedPerlin.hash3d(xi + 1, yi + 1, zi + 1);
 
         const lerp = ImprovedPerlin.lerp;
         const dot = ImprovedPerlin.dotProduct;
@@ -79,13 +83,30 @@ class ImprovedPerlin {
     }
 
     /** Hash input coordinates to get gradients using permutation table. It's a cheap way to obtain random values */
-    static hash(xi, yi, zi) {
+    static hash3d(xi, yi, zi) {
         const p = ImprovedPerlin.permutation;
         return p[p[p[xi] + yi] + zi];
     }
 
+    static hash2d(xi, yi) {
+        const p = ImprovedPerlin.permutation;
+        return p[p[xi] + yi];
+    }
+
     static smooth(t) {
+        return ImprovedPerlin.quinticSmooth(t);
+    }
+
+    static quinticSmooth(t) {
         return t * t * t * (t * (t * 6 - 15) + 10);  // 6t^5 - 15t^4 + 10t^3
+    }
+
+    static cubicSmooth(t) {
+        return t * t * (3 - 2 * t);
+    }
+
+    static noSmooth(t) {
+        return t;
     }
 
     static lerp(a, b, t) {

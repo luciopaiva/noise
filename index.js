@@ -8,6 +8,8 @@ class App {
 
         this.isRendering = false;
 
+        this.wantsSeaLevel = true;
+
         this.reset();
 
         this.hourglass.classList.remove("hidden");
@@ -38,6 +40,7 @@ class App {
     }
 
     draw() {
+        console.time("render");
         this.isRendering = true;
 
         const ctx = this.context;
@@ -51,20 +54,63 @@ class App {
                 x = i / 256;  // to avoid integer coordinates, which would generate uniform noise
                 y = j / 256;  //
 
-                const noise = FractalImprovedPerlin.noise2d(x, y, 6, 0.5, 2);
-
-                const seaLevel = 0.55;
+                let noise = FractalImprovedPerlin.noise2d(x, y, 6, 0.5, 2);
+                // ToDo turn transformations into proper independent modules
+                // noise = this.transform2(noise, x);
 
                 const bi = 4 * (this.canvas.width * j + i);
-                buffer[bi    ] = 0;
-                buffer[bi + 1] = noise >= seaLevel ? noise * 255 : 0;
-                buffer[bi + 2] = noise < seaLevel ? noise * 255 : 0;
-                buffer[bi + 3] = 255;  // alpha channel
+
+                if (this.wantsSeaLevel) {
+                    const seaLevel = 0.55;
+                    buffer[bi    ] = 0;
+                    buffer[bi + 1] = noise >= seaLevel ? noise * 255 : 0;
+                    buffer[bi + 2] = noise < seaLevel ? noise * 255 : 0;
+                    buffer[bi + 3] = 255;  // alpha channel
+                } else {
+                    const channelValue = noise * 255;
+                    buffer[bi    ] = channelValue;
+                    buffer[bi + 1] = channelValue;
+                    buffer[bi + 2] = channelValue;
+                    buffer[bi + 3] = 255;  // alpha channel
+                }
             }
         }
 
         ctx.putImageData(imageData, 0, 0);
         this.isRendering = false;
+        console.timeEnd("render");
+    }
+
+    transform1(noise) {
+        // formula idea taken from GPU Gems, Chapter 5: Implementing Improved Perlin Noise
+        // https://developer.nvidia.com/gpugems/GPUGems/gpugems_ch05.html
+        noise = Math.abs((noise - 0.55) * 2);
+        noise = noise < 0.004 ? 0 : 1;
+        return noise;
+    }
+
+    transform2(noise, x) {
+        // formula idea taken from GPU Gems, Chapter 5: Implementing Improved Perlin Noise
+        // https://developer.nvidia.com/gpugems/GPUGems/gpugems_ch05.html
+        noise = (noise - 0.5) * 2;
+        noise = (Math.sin(50 * x + 50 * noise) + 1) / 2;
+        return noise;
+    }
+
+    transform3(noise, x) {
+        // formula idea taken from GPU Gems, Chapter 5: Implementing Improved Perlin Noise
+        // https://developer.nvidia.com/gpugems/GPUGems/gpugems_ch05.html
+        noise = (noise - 0.5) * 2;
+        noise = (Math.sin(20 * x + 20 * noise) + 1) / 2;
+        return noise;
+    }
+
+    transform4(noise, x) {
+        // formula idea taken from GPU Gems, Chapter 5: Implementing Improved Perlin Noise
+        // https://developer.nvidia.com/gpugems/GPUGems/gpugems_ch05.html
+        noise = (noise - 0.5) * 2;
+        noise = (Math.sin(200 * x + 200 * noise) + 1) / 2;
+        return noise;
     }
 
     resize() {
