@@ -50,12 +50,15 @@ class App {
             for (let j = 0; j < this.canvas.height; j++) {
                 x = i / 256;  // to avoid integer coordinates, which would generate uniform noise
                 y = j / 256;  //
-                const noise = FractalImprovedPerlin.noise2d(x, y, 6, 0.5);
+
+                const noise = FractalImprovedPerlin.noise2d(x, y, 6, 0.5, 2);
+
+                const seaLevel = 0.55;
 
                 const bi = 4 * (this.canvas.width * j + i);
                 buffer[bi    ] = 0;
-                buffer[bi + 1] = noise >= 0.55 ? noise * 255 : 0;
-                buffer[bi + 2] = noise < 0.55 ? noise * 255 : 0;
+                buffer[bi + 1] = noise >= seaLevel ? noise * 255 : 0;
+                buffer[bi + 2] = noise < seaLevel ? noise * 255 : 0;
                 buffer[bi + 3] = 255;  // alpha channel
             }
         }
