@@ -2,6 +2,14 @@
 class App {
 
     constructor() {
+        // set this to ZERO to disable multi-thread mode
+        this.workerCount = 4;
+
+        this.workers = this.workerCount > 0 ?
+            Array.from(Array(this.workerCount), (_,i) => new Worker(`worker.js?${i+1}`)) : null;
+        console.info("Multi-thread mode is %c" + ((this.workerCount > 0) ? "enabled" : "disabled"),
+            "font-weight: bold");
+
         this.hourglass = document.getElementById("hourglass");
         this.canvas = document.getElementById("canvas");
         this.context = this.canvas.getContext("2d");
@@ -13,9 +21,9 @@ class App {
         this.reset();
 
         this.hourglass.classList.remove("hidden");
-        setTimeout(() => {
+        setTimeout(async () => {
             // postpone to next tick so hourglass can show up
-            this.draw();
+            await this.draw();
             this.hourglass.classList.add("hidden");
         }, 1);
 
@@ -39,7 +47,37 @@ class App {
         ctx.putImageData(imageData, 0, 0);
     }
 
-    draw() {
+    // send map chunk request to worker thread
+    submitJob(workerIndex, x0, x1, y0, y1) {
+        const worker = this.workers[workerIndex];
+        return new Promise(resolve => {
+            worker.addEventListener("message", () => resolve(event.data), { once: true });
+            worker.postMessage([x0, x1, y0, y1]);
+        });
+    }
+
+    updateCanvas(buffer, x, y, noise) {
+        // ToDo turn transformations into proper independent modules
+        // noise = this.transform2(noise, x);
+
+        const bi = 4 * (this.canvas.width * y + x);
+
+        if (this.wantsSeaLevel) {
+            const seaLevel = 0.55;
+            buffer[bi    ] = 0;
+            buffer[bi + 1] = noise >= seaLevel ? noise * 255 : 0;
+            buffer[bi + 2] = noise < seaLevel ? noise * 255 : 0;
+        } else {
+            const channelValue = noise * 255;
+            buffer[bi    ] = channelValue;
+            buffer[bi + 1] = channelValue;
+            buffer[bi + 2] = channelValue;
+        }
+        buffer[bi + 3] = 255;  // alpha channel
+    }
+
+    /** @return {void} */
+    async draw() {
         console.time("render");
         this.isRendering = true;
 
@@ -47,31 +85,34 @@ class App {
         const imageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         const buffer = imageData.data;
 
-        let x = 0;
-        let y = 0;
-        for (let i = 0; i < this.canvas.width; i++) {
-            for (let j = 0; j < this.canvas.height; j++) {
-                x = i / 256;  // to avoid integer coordinates, which would generate uniform noise
-                y = j / 256;  //
+        if (this.workerCount > 0) {
+            // submit map slices to workers in parallel
+            const sliceWidth = Math.ceil(this.canvas.width / this.workerCount);
+            let promises = [];
+            for (let i = 0, x = 0; i < this.workerCount; i++, x += sliceWidth) {
+                promises.push(this.submitJob(i, x, Math.min(x + sliceWidth, this.canvas.width), 0, this.canvas.height));
+            }
+            // wait for all workers to be done
+            const chunks = await Promise.all(promises);
 
-                let noise = FractalImprovedPerlin.noise2d(x, y, 6, 0.5, 2);
-                // ToDo turn transformations into proper independent modules
-                // noise = this.transform2(noise, x);
+            for (let sliceIndex = 0; sliceIndex < this.workerCount; sliceIndex++) {
+                const x0 = sliceIndex * sliceWidth;
+                const x1 = Math.min(x0 + sliceWidth, this.canvas.width);
+                const currentSliceWidth = x1 - x0;
 
-                const bi = 4 * (this.canvas.width * j + i);
-
-                if (this.wantsSeaLevel) {
-                    const seaLevel = 0.55;
-                    buffer[bi    ] = 0;
-                    buffer[bi + 1] = noise >= seaLevel ? noise * 255 : 0;
-                    buffer[bi + 2] = noise < seaLevel ? noise * 255 : 0;
-                    buffer[bi + 3] = 255;  // alpha channel
-                } else {
-                    const channelValue = noise * 255;
-                    buffer[bi    ] = channelValue;
-                    buffer[bi + 1] = channelValue;
-                    buffer[bi + 2] = channelValue;
-                    buffer[bi + 3] = 255;  // alpha channel
+                for (let x = x0; x < x1; x++) {
+                    for (let y = 0; y < this.canvas.height; y++) {
+                        let noise = chunks[sliceIndex][y * currentSliceWidth + x];
+                        this.updateCanvas(buffer, x, y, noise);
+                    }
+                }
+            }
+        } else {
+            // single-thread mode
+            for (let x = 0; x < this.canvas.width; x++) {
+                for (let y = 0; y < this.canvas.height; y++) {
+                    let noise = generateNoise(x, y);
+                    this.updateCanvas(buffer, x, y, noise);
                 }
             }
         }
