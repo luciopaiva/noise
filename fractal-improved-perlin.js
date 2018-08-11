@@ -54,3 +54,5 @@ class FractalImprovedPerlin {
         return value / maxValue;  // normalize it
     }
 }
+
+FractalImprovedPerlin.INTER_GRADIENT_SPACING = 64;  // this many pixels between adjacent gradients

@@ -1,14 +1,23 @@
 
 class App {
 
-    constructor() {
-        // set this to ZERO to disable multi-thread mode
-        this.workerCount = 4;
+    static get MAX_THREADS() { return 8; }
 
-        this.workers = this.workerCount > 0 ?
-            Array.from(Array(this.workerCount), (_,i) => new Worker(`worker.js?${i+1}`)) : null;
-        console.info("Multi-thread mode is %c" + ((this.workerCount > 0) ? "enabled" : "disabled"),
-            "font-weight: bold");
+    constructor() {
+        this.threadsElement = document.getElementById("threads");
+        this.octavesElement = document.getElementById("octaves");
+        this.terrainModeElement = document.getElementById("terrain-mode");
+        this.noisePointsElement = document.getElementById("noise-points");
+        this.refreshButton = document.getElementById("refresh");
+
+        this.drawOnEvent(this.threadsElement, "input");
+        this.drawOnEvent(this.octavesElement, "input");
+        this.drawOnEvent(this.terrainModeElement, "input");
+        this.drawOnEvent(this.noisePointsElement, "input");
+        this.drawOnEvent(this.refreshButton, "click");
+
+        this.workers = Array.from(Array(App.MAX_THREADS), (_,i) => new Worker(`worker.js?${i+1}`));
+        console.info(`Threads available: ${this.workers.length}`);
 
         this.hourglass = document.getElementById("hourglass");
         this.canvas = document.getElementById("canvas");
@@ -16,18 +25,23 @@ class App {
 
         this.isRendering = false;
 
-        this.wantsSeaLevel = true;
-
         this.reset();
+        this.showHourglassAndDraw();
 
+        this.drawOnEvent(window, "resize");
+    }
+
+    drawOnEvent(element, event) {
+        element.addEventListener(event, () => this.showHourglassAndDraw());
+    }
+
+    showHourglassAndDraw() {
         this.hourglass.classList.remove("hidden");
         setTimeout(async () => {
             // postpone to next tick so hourglass can show up
             await this.draw();
             this.hourglass.classList.add("hidden");
         }, 1);
-
-        window.addEventListener("resize", this.resize.bind(this));
     }
 
     /** Draws a black canvas */
@@ -48,11 +62,11 @@ class App {
     }
 
     // send map chunk request to worker thread
-    submitJob(workerIndex, x0, x1, y0, y1) {
+    submitJob(workerIndex, x0, x1, y0, y1, octaves) {
         const worker = this.workers[workerIndex];
         return new Promise(resolve => {
             worker.addEventListener("message", () => resolve(event.data), { once: true });
-            worker.postMessage([x0, x1, y0, y1]);
+            worker.postMessage([x0, x1, y0, y1, octaves]);
         });
     }
 
@@ -62,7 +76,9 @@ class App {
 
         const bi = 4 * (this.canvas.width * y + x);
 
-        if (this.wantsSeaLevel) {
+        const wantsSeaLevel = this.terrainModeElement.checked;
+
+        if (wantsSeaLevel) {
             const seaLevel = 0.55;
             buffer[bi    ] = 0;
             buffer[bi + 1] = noise >= seaLevel ? noise * 255 : 0;
@@ -78,24 +94,33 @@ class App {
 
     /** @return {void} */
     async draw() {
+        if (this.isRendering) {
+            return;
+        }
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+
         console.time("render");
         this.isRendering = true;
+
+        const desiredOctaves = parseInt(this.octavesElement.value, 10);
 
         const ctx = this.context;
         const imageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         const buffer = imageData.data;
 
-        if (this.workerCount > 0) {
+        const workerCount = Math.min(App.MAX_THREADS, parseInt(this.threadsElement.value, 10));
+        if (workerCount > 0) {
             // submit map slices to workers in parallel
-            const sliceWidth = Math.ceil(this.canvas.width / this.workerCount);
+            const sliceWidth = Math.ceil(this.canvas.width / workerCount);
             let promises = [];
-            for (let i = 0, x = 0; i < this.workerCount; i++, x += sliceWidth) {
-                promises.push(this.submitJob(i, x, Math.min(x + sliceWidth, this.canvas.width), 0, this.canvas.height));
+            for (let i = 0, x = 0; i < workerCount; i++, x += sliceWidth) {
+                promises.push(this.submitJob(i, x, Math.min(x + sliceWidth, this.canvas.width), 0, this.canvas.height, desiredOctaves));
             }
             // wait for all workers to be done
             const chunks = await Promise.all(promises);
 
-            for (let sliceIndex = 0; sliceIndex < this.workerCount; sliceIndex++) {
+            for (let sliceIndex = 0; sliceIndex < workerCount; sliceIndex++) {
                 const x0 = sliceIndex * sliceWidth;
                 const x1 = Math.min(x0 + sliceWidth, this.canvas.width);
                 const currentSliceWidth = x1 - x0;
@@ -108,18 +133,42 @@ class App {
                 }
             }
         } else {
+            let min = Number.POSITIVE_INFINITY;
+            let max = Number.NEGATIVE_INFINITY;
+
             // single-thread mode
             for (let x = 0; x < this.canvas.width; x++) {
                 for (let y = 0; y < this.canvas.height; y++) {
-                    let noise = generateNoise(x, y);
+                    let noise = generateNoise(x, y, desiredOctaves);
                     this.updateCanvas(buffer, x, y, noise);
+                    if (noise > max) max = noise;
+                    if (noise < min) min = noise;
+                }
+            }
+
+            console.info(`min=${min.toFixed(3)}, max=${max.toFixed(3)}`);
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+
+        if (this.noisePointsElement.checked) {
+            ctx.fillStyle = "red";
+            for (let x = 0; x < this.canvas.width; x += FractalImprovedPerlin.INTER_GRADIENT_SPACING) {
+                for (let y = 0; y < this.canvas.height; y += FractalImprovedPerlin.INTER_GRADIENT_SPACING) {
+                    this.drawPoint(x, y);
                 }
             }
         }
 
-        ctx.putImageData(imageData, 0, 0);
         this.isRendering = false;
         console.timeEnd("render");
+    }
+
+    drawPoint(x, y) {
+        const ctx = this.context;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     transform1(noise) {
@@ -152,14 +201,6 @@ class App {
         noise = (noise - 0.5) * 2;
         noise = (Math.sin(200 * x + 200 * noise) + 1) / 2;
         return noise;
-    }
-
-    resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        if (!this.isRendering) {
-            this.draw();
-        }
     }
 }
 
