@@ -25,10 +25,10 @@ class Palette {
             for (let i = this.nextPosition; i < endIndex; i++) {
                 const ratio = (i - this.nextPosition) / (endIndex - this.nextPosition);
                 const pos = i << 2;
-                this.colors[pos    ] = Math.floor(this.lerp(this.startColor[0], r, ratio));
-                this.colors[pos + 1] = Math.floor(this.lerp(this.startColor[1], g, ratio));
-                this.colors[pos + 2] = Math.floor(this.lerp(this.startColor[2], b, ratio));
-                this.colors[pos + 3] = Math.floor(this.lerp(this.startColor[3], a, ratio));
+                this.colors[pos    ] = Math.floor(Palette.lerp(this.startColor[0], r, ratio));
+                this.colors[pos + 1] = Math.floor(Palette.lerp(this.startColor[1], g, ratio));
+                this.colors[pos + 2] = Math.floor(Palette.lerp(this.startColor[2], b, ratio));
+                this.colors[pos + 3] = Math.floor(Palette.lerp(this.startColor[3], a, ratio));
             }
             this.nextPosition = endIndex;
         }
@@ -41,7 +41,7 @@ class Palette {
      * @param {Number} t - some value in the range [0, 1[
      * @returns {Number} interpolated value between a and b
      */
-    lerp(a, b, t) {
+    static lerp(a, b, t) {
         return a + (b - a) * t;
     }
 
@@ -52,18 +52,49 @@ class Palette {
     valueToColorIndex(value) {
         return Math.floor(value * this.size)
     }
+
+    static getCssPaletteColorProperty(i) {
+        const isValid = value => typeof value === "string" && value.length > 0;
+        const value = window.getComputedStyle(document.documentElement).getPropertyValue(`--palette-${i}-value`);
+        const color = window.getComputedStyle(document.documentElement).getPropertyValue(`--palette-${i}-color`);
+        if (isValid(value) && isValid(color)) {
+            const matchRGBA = color.match(/rgba.*?\(.*?(\d+).*?(\d+).*?(\d+).*?(\d+).*?\)/);
+            if (matchRGBA) {
+                const r = parseInt(matchRGBA[1], 10);
+                const g = parseInt(matchRGBA[2], 10);
+                const b = parseInt(matchRGBA[3], 10);
+                const a = Math.floor(parseFloat(matchRGBA[4]) * 255);
+                return [parseFloat(value), r, g, b, a];
+            } else {
+                const matchRGB = color.match(/rgb.*?\(.*?(\d+).*?(\d+).*?(\d+).*?\)/);
+                if (matchRGB) {
+                    const r = parseInt(matchRGB[1], 10);
+                    const g = parseInt(matchRGB[2], 10);
+                    const b = parseInt(matchRGB[3], 10);
+                    const a = 255;
+                    return [parseFloat(value), r, g, b, a];
+                }
+            }
+        }
+        return null;
+    }
+
+    loadColorsFromCssProperties() {
+        for (let i = 0; ; i++) {
+            const colorParams = Palette.getCssPaletteColorProperty(i);
+            if (colorParams === null) {
+                break;
+            }
+            console.info(colorParams);
+            colorParams[0] = (colorParams[0] + 1) / 2;  // convert from [-1, 1] to [0, 1]
+            this.addGradientPoint(...colorParams);
+        }
+    }
 }
 
 class TerrainPalette extends Palette {
     constructor (size) {
         super(size);
-        this.addGradientPoint((-1.0000 + 1) / 2,   0,   0, 128, 255);  // deeps
-        this.addGradientPoint((-0.2500 + 1) / 2,   0,   0, 255, 255);  // shallow
-        this.addGradientPoint(( 0.0000 + 1) / 2,   0, 128, 255, 255);  // shore
-        this.addGradientPoint(( 0.0625 + 1) / 2, 240, 240,  64, 255);  // sand
-        this.addGradientPoint(( 0.1250 + 1) / 2,  32, 160,   0, 255);  // grass
-        this.addGradientPoint(( 0.3750 + 1) / 2, 224, 224,   0, 255);  // dirt
-        this.addGradientPoint(( 0.7550 + 1) / 2, 128, 128, 128, 255);  // rock
-        this.addGradientPoint(( 1.0000 + 1) / 2, 255, 255, 255, 255);  // snow
+        this.loadColorsFromCssProperties();
     }
 }

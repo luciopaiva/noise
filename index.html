@@ -5,6 +5,24 @@
     <title>Noise</title>
 
     <style>
+        :root {
+            --palette-0-value: -1.0000;
+            --palette-0-color: rgba(  0,   0, 128, 1.0);  /* deeps */
+            --palette-1-value: -0.2500;
+            --palette-1-color: rgba(  0,   0, 255, 1.0);  /* shallow */
+            --palette-2-value:  0.0000;
+            --palette-2-color: rgb(0, 112, 255);  /* shore */
+            --palette-3-value:  0.0225;
+            --palette-3-color: rgb(168, 162, 111);  /* sand */
+            --palette-4-value:  0.0600;
+            --palette-4-color: rgb(19, 120, 37);  /* grass */
+            --palette-5-value:  0.3750;
+            --palette-5-color: rgb(16, 79, 27);  /* dirt */
+            --palette-6-value:  0.8000;
+            --palette-6-color: rgba(128, 128, 128, 1.0);  /* rock */
+            --palette-7-value:  1.0000;
+            --palette-7-color: rgba(255, 255, 255, 1.0);  /* snow */
+        }
         html, body {
             margin: 0;
             padding: 0;
@@ -94,9 +112,9 @@
 <div class="panel control-panel">
     <div class="input-controls">
         <input type="number" min="0" max="8" value="4" id="threads" checked><label for="threads">Threads</label>
-        <input type="number" id="octaves" min="1" max="16" value="4"><label for="octaves">Octaves</label>
+        <input type="number" id="octaves" min="1" max="16" value="5"><label for="octaves">Octaves</label>
         <input type="checkbox" id="terrain-mode" checked><label for="terrain-mode">Terrain mode</label>
-        <input type="checkbox" id="noise-points" checked><label for="noise-points">Noise points</label>
+        <input type="checkbox" id="noise-points"><label for="noise-points">Noise points</label>
     </div>
 
     <hr>
