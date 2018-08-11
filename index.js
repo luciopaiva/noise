@@ -4,6 +4,8 @@ class App {
     static get MAX_THREADS() { return 8; }
 
     constructor() {
+        this.palette = new TerrainPalette(512);
+
         this.threadsElement = document.getElementById("threads");
         this.octavesElement = document.getElementById("octaves");
         this.terrainModeElement = document.getElementById("terrain-mode");
@@ -76,20 +78,21 @@ class App {
 
         const bi = 4 * (this.canvas.width * y + x);
 
-        const wantsSeaLevel = this.terrainModeElement.checked;
+        const isTerrainMode = this.terrainModeElement.checked;
 
-        if (wantsSeaLevel) {
-            const seaLevel = 0.55;
-            buffer[bi    ] = 0;
-            buffer[bi + 1] = noise >= seaLevel ? noise * 255 : 0;
-            buffer[bi + 2] = noise < seaLevel ? noise * 255 : 0;
+        if (isTerrainMode) {
+            const [r, g, b, a] = this.palette.color(noise);
+            buffer[bi    ] = r;
+            buffer[bi + 1] = g;
+            buffer[bi + 2] = b;
+            buffer[bi + 3] = a;
         } else {
             const channelValue = noise * 255;
             buffer[bi    ] = channelValue;
             buffer[bi + 1] = channelValue;
             buffer[bi + 2] = channelValue;
+            buffer[bi + 3] = 255;  // alpha channel
         }
-        buffer[bi + 3] = 255;  // alpha channel
     }
 
     /** @return {void} */
