@@ -7,6 +7,7 @@ class Palette {
         this.colors = Array(this.size << 2);  // r, g, b, a, r, g, b, a, r, g, b, a, ...
         this.nextPosition = 0;
         this.startColor = null;
+        this.noiseLevel = 0;
     }
 
     /**
@@ -19,6 +20,13 @@ class Palette {
         return this.colors.slice(pos, pos + 4);
     }
 
+    /**
+     * @param {Number} level - noise amplitude in [0, 1[
+     */
+    setNoiseLevel(level) {
+        this.noiseLevel = level * 255;
+    }
+
     addGradientPoint(value, r, g, b, a) {
         if (this.startColor !== null) {
             const endIndex = this.valueToColorIndex(value);
@@ -29,6 +37,13 @@ class Palette {
                 this.colors[pos + 1] = Math.floor(Palette.lerp(this.startColor[1], g, ratio));
                 this.colors[pos + 2] = Math.floor(Palette.lerp(this.startColor[2], b, ratio));
                 this.colors[pos + 3] = Math.floor(Palette.lerp(this.startColor[3], a, ratio));
+
+                if (this.noiseLevel > 0) {
+                    // bake some noise into the palette
+                    this.colors[pos    ] += Math.min(255, Math.floor(Math.random() * this.noiseLevel));
+                    this.colors[pos + 1] += Math.min(255, Math.floor(Math.random() * this.noiseLevel));
+                    this.colors[pos + 2] += Math.min(255, Math.floor(Math.random() * this.noiseLevel));
+                }
             }
             this.nextPosition = endIndex;
         }
@@ -94,6 +109,7 @@ class Palette {
 class TerrainPalette extends Palette {
     constructor (size) {
         super(size);
+        this.setNoiseLevel(0.05);
         this.loadColorsFromCssProperties();
     }
 }
