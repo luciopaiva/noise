@@ -97,8 +97,12 @@ class App {
         if (this.isRendering) {
             return;
         }
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+
+        if (this.canvas.width !== window.innerWidth || this.canvas.height !== window.innerHeight) {
+            // unnecessarily resetting the canvas blanks it momentarily, making it difficult to compare settings changes
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
 
         console.time("render");
         this.isRendering = true;
