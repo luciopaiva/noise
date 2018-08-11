@@ -9,8 +9,9 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            font-family: monospace;
             color: white;
+            font-family: monospace;
+            font-size: 11px;
         }
         #canvas {
             width: 100vw;
@@ -23,18 +24,19 @@
             transform: translate(-50%, -50%);
             font-size: 72px;
         }
+        .panel {
+            padding: 10px;
+            user-select: none;
+            border-radius: 2px;
+            color: white;
+        }
         .control-panel {
             position: absolute;
             top: 10px;
             right: 10px;
             width: 160px;
+
             background-color: rgba(255, 255, 255, 0.4);
-            color: black;
-            font-family: monospace;
-            font-size: 11px;
-            padding: 10px;
-            border-radius: 2px;
-            user-select: none;
         }
         .control-panel > * {
             width: 100%;
@@ -70,6 +72,16 @@
             height: 0;
             margin: 10px 0;
         }
+        a, a:hover, a:active, a:visited {
+            color: white;
+        }
+        .footer {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+
+            background-color: rgba(255, 255, 255, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -78,7 +90,7 @@
 
 <canvas id="canvas"></canvas>
 
-<div class="control-panel">
+<div class="panel control-panel">
     <div class="input-controls">
         <input type="number" min="0" max="8" value="4" id="threads" checked><label for="threads">Threads</label>
         <input type="number" id="octaves" min="1" max="16" value="4"><label for="octaves">Octaves</label>
@@ -90,6 +102,8 @@
 
     <div></div><button id="refresh">Refresh</button>
 </div>
+
+<div class="panel footer"><a href="//luciopaiva.com" target="_blank">Lucio Paiva</a> 2018</div>
 
 <script src="lcg.js"></script>
 <script src="improved-perlin.js"></script>
