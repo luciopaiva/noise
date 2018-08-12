@@ -14,14 +14,15 @@ class App {
         this.terrainModeElement = document.getElementById("terrain-mode");
         this.noisePointsElement = document.getElementById("noise-points");
         this.sunModeElement = document.getElementById("sun-mode");
+        this.dayAndNightElement = document.getElementById("day-and-night");
         this.refreshButton = document.getElementById("refresh");
 
-        this.drawOnEvent(this.threadsElement, "input");
-        this.drawOnEvent(this.octavesElement, "input");
-        this.drawOnEvent(this.terrainModeElement, "input");
-        this.drawOnEvent(this.noisePointsElement, "input");
-        this.drawOnEvent(this.sunModeElement, "input");
-        this.drawOnEvent(this.refreshButton, "click");
+        this.generateTerrainOnEvent(this.threadsElement, "input");
+        this.generateTerrainOnEvent(this.octavesElement, "input");
+        this.generateTerrainOnEvent(this.terrainModeElement, "input");
+        this.generateTerrainOnEvent(this.noisePointsElement, "input");
+        this.generateTerrainOnEvent(this.sunModeElement, "input");
+        this.generateTerrainOnEvent(this.refreshButton, "click");
 
         this.workers = Array.from(Array(App.MAX_THREADS), (_,i) => new Worker(`worker.js?${i+1}`));
         console.info(`Threads available: ${this.workers.length}`);
@@ -30,24 +31,27 @@ class App {
         this.canvas = document.getElementById("canvas");
         this.context = this.canvas.getContext("2d");
 
-        this.isRendering = false;
-        this.seaLevel = 0.5;
+        this.isGeneratingTerrain = false;
+        this.seaLevel = 0.5;  // ToDo this currently can't be changed without also manually changing the CSS color palette
+        this.sunAngle = .75 * Math.PI;
 
         this.reset();
-        this.showHourglassAndDraw();
+        this.showHourglassAndGenerateTerrain();
 
-        this.drawOnEvent(window, "resize");
+        this.generateTerrainOnEvent(window, "resize");
+
+        this.draw();
     }
 
-    drawOnEvent(element, event) {
-        element.addEventListener(event, () => this.showHourglassAndDraw());
+    generateTerrainOnEvent(element, event) {
+        element.addEventListener(event, () => this.showHourglassAndGenerateTerrain());
     }
 
-    showHourglassAndDraw() {
+    showHourglassAndGenerateTerrain() {
         this.hourglass.classList.remove("hidden");
         setTimeout(async () => {
             // postpone to next tick so hourglass can show up
-            await this.draw();
+            await this.generateTerrain();
             this.hourglass.classList.add("hidden");
         }, 1);
     }
@@ -97,13 +101,13 @@ class App {
             buffer[bi    ] = channelValue;
             buffer[bi + 1] = channelValue;
             buffer[bi + 2] = channelValue;
-            buffer[bi + 3] = 255;  // alpha channel
+            buffer[bi + 3] = 255;
         }
     }
 
     /** @return {void} */
-    async draw() {
-        if (this.isRendering) {
+    async generateTerrain() {
+        if (this.isGeneratingTerrain) {
             return;
         }
 
@@ -120,13 +124,9 @@ class App {
         }
 
         console.time("render");
-        this.isRendering = true;
+        this.isGeneratingTerrain = true;
 
         const desiredOctaves = parseInt(this.octavesElement.value, 10);
-
-        const ctx = this.context;
-        const imageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-        const buffer = imageData.data;
 
         const workerCount = Math.min(App.MAX_THREADS, parseInt(this.threadsElement.value, 10));
         if (workerCount > 0) {
@@ -171,9 +171,29 @@ class App {
             console.info(`min=${min.toFixed(3)}, max=${max.toFixed(3)}`);
         }
 
+        this.isGeneratingTerrain = false;
+        console.timeEnd("render");
+
+        this.drawOnce();
+    }
+
+    draw() {
+        if (!this.isGeneratingTerrain && this.dayAndNightElement.checked) {
+            this.sunAngle += Math.PI / 30;
+            this.drawOnce();
+        }
+
+        requestAnimationFrame(this.draw.bind(this));
+    }
+
+    drawOnce() {
         if (this.sunModeElement.checked) {
             this.calculateLighting();
         }
+
+        const ctx = this.context;
+        const imageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        const buffer = imageData.data;
 
         let rowPosition = 0;
         for (let y = 0; y < this.canvas.height; y++) {
@@ -195,15 +215,11 @@ class App {
                 }
             }
         }
-
-        this.isRendering = false;
-        console.timeEnd("render");
     }
 
     calculateLighting() {
-        const sunAngle = .75 * Math.PI;
-        const sunSin = Math.sin(sunAngle);
-        const sun = new Vector(Math.cos(sunAngle), sunSin, 0);
+        const sunSin = Math.sin(this.sunAngle);
+        const sun = new Vector(Math.cos(this.sunAngle), sunSin, 0);
         const a = new Vector(0, 0, 0);
         const b = new Vector(0, 0, 0);
         let rowPosition = 0;
@@ -230,6 +246,8 @@ class App {
                     } else {
                         this.lightingData[rowPosition + x] = sunSin;
                     }
+                } else {
+                    this.lightingData[rowPosition] = 0;
                 }
             }
             rowPosition += this.canvas.width;
