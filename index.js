@@ -10,7 +10,7 @@ class App {
         this.elevationData = [];
         this.lightingData = [];
 
-        this.palette = new TerrainPalette(512);
+        this.palette = new TerrainPalette(1 << 13);
 
         this.threadsElement = document.getElementById("threads");
         this.octavesElement = document.getElementById("octaves");

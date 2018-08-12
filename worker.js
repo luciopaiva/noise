@@ -1,6 +1,6 @@
 
 function runWebWorker() {
-    importScripts("improved-perlin.js", "fractal-improved-perlin.js", "noise.js");
+    importScripts("vector.js", "improved-perlin.js", "fractal-improved-perlin.js", "noise.js");
 
     const workerId = `[worker${location.search.substr(1)}]`;
     console.info(`${workerId} started`);

@@ -7,11 +7,11 @@ class Vector {
      * @param {Number} y
      * @param {Number} z
      */
-    constructor(x, y, z) {
+    constructor(x, y, z = 0) {
         this.set(x, y, z);
     }
 
-    set(x, y, z) {
+    set(x, y, z = 0) {
         this.x = x;
         this.y = y;
         this.z = z;
