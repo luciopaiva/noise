@@ -101,7 +101,6 @@ class Palette {
             if (colorParams === null) {
                 break;
             }
-            colorParams[0] = (colorParams[0] + 1) / 2;  // convert from [-1, 1] to [0, 1]
             this.addGradientPoint(...colorParams);
         }
     }
