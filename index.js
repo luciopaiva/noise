@@ -177,10 +177,93 @@ class App {
             console.info(`min=${min.toFixed(3)}, max=${max.toFixed(3)}`);
         }
 
+        // this.runWaterDrops();
+
         this.isGeneratingTerrain = false;
         console.timeEnd("render");
 
         this.drawOnce();
+    }
+
+    getElevationAt(x, y) {
+        if (x < 0 || x >= this.canvas.width || y < 0 || y >= this.canvas.height) {
+            return null;
+        }
+        return this.elevationData[y * this.canvas.width + x];
+    }
+
+    setElevationAt(x, y, elevation) {
+        if (x < 0 || x >= this.canvas.width || y < 0 || y >= this.canvas.height) {
+            return;
+        }
+        this.elevationData[y * this.canvas.width + x] = elevation;
+    }
+
+    getLowestNeighborCoordinate(x, y, sourceElevation) {
+        let neighborCoord = null;
+        let sinkElevation = sourceElevation;
+
+        const testNeighbor = (nx, ny) => {
+            const neighborElevation = this.getElevationAt(nx, ny);
+            if (neighborElevation !== null && neighborElevation < sinkElevation) {
+                neighborCoord = [nx, ny];
+                sinkElevation = neighborElevation;
+            }
+        };
+
+        testNeighbor(x + 1, y);
+        testNeighbor(x + 1, y - 1);
+        testNeighbor(x, y - 1);
+        testNeighbor(x - 1, y - 1);
+        testNeighbor(x - 1, y);
+        testNeighbor(x - 1, y + 1);
+        testNeighbor(x, y + 1);
+        testNeighbor(x + 1, y + 1);
+
+        return [neighborCoord, sinkElevation];
+    }
+
+    /**
+     * Simple experiment: let random drops of water flow down the terrain. For most of the rivers, the result is not
+     * what I expected. Rivers are too straight. I'm under the impression that improved Perlin noise's 16 gradients are
+     * causing that, and that for realism we'd need to add more gradients to the collection.
+     *
+     * Another possibility is forcing the river to meander procedurally, carving the terrain in the process.
+     */
+    runWaterDrops() {
+        const random = new LCG(42);
+        for (let i = 0; i < 10000; i++) {
+            let x = Math.floor(this.canvas.width * random.next());
+            let y = Math.floor(this.canvas.height * random.next());
+
+            let currentElevation = this.getElevationAt(x, y);
+            if (currentElevation > this.seaLevel * 1.1) {
+                const path = [[x, y]];
+
+                for (let j = 0; j < 200; j++) {
+                    const [coords, neighborElevation] = this.getLowestNeighborCoordinate(x, y, currentElevation);
+                    if (!coords) {
+                        break;
+                    }
+
+                    path.push(coords);
+
+                    [x, y] = coords;
+                    currentElevation = neighborElevation;
+
+                    if (currentElevation <= this.seaLevel) {
+                        break;
+                    }
+                }
+
+                if (path.length > 10) {
+                    // erode terrain
+                    for (const coord of path) {
+                        this.setElevationAt(...coord, this.getElevationAt(...coord) - .0015);
+                    }
+                }
+            }
+        }
     }
 
     draw() {
