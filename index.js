@@ -4,18 +4,23 @@ class App {
     static get MAX_THREADS() { return 8; }
 
     constructor() {
+        this.elevationData = [];
+        this.lightingData = [];
+
         this.palette = new TerrainPalette(512);
 
         this.threadsElement = document.getElementById("threads");
         this.octavesElement = document.getElementById("octaves");
         this.terrainModeElement = document.getElementById("terrain-mode");
         this.noisePointsElement = document.getElementById("noise-points");
+        this.sunModeElement = document.getElementById("sun-mode");
         this.refreshButton = document.getElementById("refresh");
 
         this.drawOnEvent(this.threadsElement, "input");
         this.drawOnEvent(this.octavesElement, "input");
         this.drawOnEvent(this.terrainModeElement, "input");
         this.drawOnEvent(this.noisePointsElement, "input");
+        this.drawOnEvent(this.sunModeElement, "input");
         this.drawOnEvent(this.refreshButton, "click");
 
         this.workers = Array.from(Array(App.MAX_THREADS), (_,i) => new Worker(`worker.js?${i+1}`));
@@ -26,6 +31,7 @@ class App {
         this.context = this.canvas.getContext("2d");
 
         this.isRendering = false;
+        this.seaLevel = 0.5;
 
         this.reset();
         this.showHourglassAndDraw();
@@ -72,7 +78,7 @@ class App {
         });
     }
 
-    updateCanvas(buffer, x, y, noise) {
+    updateCanvas(buffer, x, y, noise, lightingLevel = 1) {
         // ToDo turn transformations into proper independent modules
         // noise = this.transform2(noise, x);
 
@@ -82,9 +88,9 @@ class App {
 
         if (isTerrainMode) {
             const [r, g, b, a] = this.palette.color(noise);
-            buffer[bi    ] = r;
-            buffer[bi + 1] = g;
-            buffer[bi + 2] = b;
+            buffer[bi    ] = Math.floor(r * lightingLevel);
+            buffer[bi + 1] = Math.floor(g * lightingLevel);
+            buffer[bi + 2] = Math.floor(b * lightingLevel);
             buffer[bi + 3] = a;
         } else {
             const channelValue = noise * 255;
@@ -105,6 +111,12 @@ class App {
             // unnecessarily resetting the canvas blanks it momentarily, making it difficult to compare settings changes
             this.canvas.width = window.innerWidth;
             this.canvas.height = window.innerHeight;
+        }
+
+        const totalAreaSize = this.canvas.width * this.canvas.height;
+        if (totalAreaSize !== this.elevationData.length) {
+            this.elevationData = Array(totalAreaSize);
+            this.lightingData = Array(totalAreaSize);
         }
 
         console.time("render");
@@ -132,11 +144,12 @@ class App {
                 const x1 = Math.min(x0 + sliceWidth, this.canvas.width);
                 const currentSliceWidth = x1 - x0;
 
-                for (let x = x0; x < x1; x++) {
-                    for (let y = 0; y < this.canvas.height; y++) {
-                        let noise = chunks[sliceIndex][y * currentSliceWidth + x];
-                        this.updateCanvas(buffer, x, y, noise);
+                let rowPosition = 0;
+                for (let y = 0; y < this.canvas.height; y++) {
+                    for (let x = x0; x < x1; x++) {
+                        this.elevationData[rowPosition + x] = chunks[sliceIndex][y * currentSliceWidth + x];
                     }
+                    rowPosition += this.canvas.width;
                 }
             }
         } else {
@@ -144,16 +157,32 @@ class App {
             let max = Number.NEGATIVE_INFINITY;
 
             // single-thread mode
-            for (let x = 0; x < this.canvas.width; x++) {
-                for (let y = 0; y < this.canvas.height; y++) {
+            let rowPosition = 0;
+            for (let y = 0; y < this.canvas.height; y++) {
+                for (let x = 0; x < this.canvas.width; x++) {
                     let noise = generateNoise(x, y, desiredOctaves);
-                    this.updateCanvas(buffer, x, y, noise);
+                    this.elevationData[rowPosition + x] = noise;
                     if (noise > max) max = noise;
                     if (noise < min) min = noise;
                 }
+                rowPosition += this.canvas.width;
             }
 
             console.info(`min=${min.toFixed(3)}, max=${max.toFixed(3)}`);
+        }
+
+        if (this.sunModeElement.checked) {
+            this.calculateLighting();
+        }
+
+        let rowPosition = 0;
+        for (let y = 0; y < this.canvas.height; y++) {
+            for (let x = 0; x < this.canvas.width; x++) {
+                const elevation = this.elevationData[rowPosition + x];
+                const lighting = this.sunModeElement.checked ? this.lightingData[rowPosition + x] : 1;
+                this.updateCanvas(buffer, x, y, elevation, lighting);
+            }
+            rowPosition += this.canvas.width;
         }
 
         ctx.putImageData(imageData, 0, 0);
@@ -169,6 +198,43 @@ class App {
 
         this.isRendering = false;
         console.timeEnd("render");
+    }
+
+    calculateLighting() {
+        const sunAngle = .75 * Math.PI;
+        const sunSin = Math.sin(sunAngle);
+        const sun = new Vector(Math.cos(sunAngle), sunSin, 0);
+        const a = new Vector(0, 0, 0);
+        const b = new Vector(0, 0, 0);
+        let rowPosition = 0;
+        let minLight = Number.POSITIVE_INFINITY;
+        let maxLight = Number.NEGATIVE_INFINITY;
+        for (let y = 0; y < this.canvas.height; y++) {
+            for (let x = 0; x < this.canvas.width; x++) {
+                let light = 1;
+                const elevation = this.elevationData[rowPosition + x];
+                if (x > 0) {
+                    if (elevation > this.seaLevel) {
+                        // take the elevation next to us as reference to calculate our normal
+                        const previousElevation = this.elevationData[rowPosition + x - 1];
+                        a.set(0, previousElevation, 0);
+                        b.set(0.02, elevation, 0);  // x coord empirically determined for best results
+                        // the dot product will check how aligned with sun rays our normal is
+                        light = a.subtract(b).normalize().rotateZ(-Math.PI / 2).dot(sun);
+                        light = Math.max(0, light);  // negative values mean total darkness
+
+                        this.lightingData[rowPosition + x] = light;
+
+                        if (light > maxLight) maxLight = light;
+                        if (light < minLight) minLight = light;
+                    } else {
+                        this.lightingData[rowPosition + x] = sunSin;
+                    }
+                }
+            }
+            rowPosition += this.canvas.width;
+        }
+        console.info(`Surface light variation: ${minLight}, ${maxLight}`);
     }
 
     drawPoint(x, y) {
