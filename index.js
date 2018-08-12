@@ -33,7 +33,10 @@ class App {
 
         this.isGeneratingTerrain = false;
         this.seaLevel = 0.5;  // ToDo this currently can't be changed without also manually changing the CSS color palette
-        this.sunAngle = .75 * Math.PI;
+        this.sunAngle = .65 * Math.PI;
+        this.sunStep = Math.PI / 30;  // each animation frame will step this many radians
+        this.sunsetAngle = (5/4) * Math.PI;  // a bit after sunset actually
+        this.sunriseAngle = -(1/4) * Math.PI;  // a bit before sunrise actually
 
         this.reset();
         this.showHourglassAndGenerateTerrain();
@@ -179,7 +182,11 @@ class App {
 
     draw() {
         if (!this.isGeneratingTerrain && this.dayAndNightElement.checked) {
-            this.sunAngle += Math.PI / 30;
+            this.sunAngle += this.sunStep;
+            if (this.sunAngle > this.sunsetAngle) {
+                // advance through the night quickly
+                this.sunAngle = this.sunriseAngle;
+            }
             this.drawOnce();
         }
 
@@ -220,6 +227,7 @@ class App {
     calculateLighting() {
         const sunSin = Math.sin(this.sunAngle);
         const sun = new Vector(Math.cos(this.sunAngle), sunSin, 0);
+        const seaBrightness = .75 * sunSin;
         const a = new Vector(0, 0, 0);
         const b = new Vector(0, 0, 0);
         let rowPosition = 0;
@@ -244,9 +252,10 @@ class App {
                         if (light > maxLight) maxLight = light;
                         if (light < minLight) minLight = light;
                     } else {
-                        this.lightingData[rowPosition + x] = sunSin;
+                        this.lightingData[rowPosition + x] = seaBrightness;
                     }
                 } else {
+                    // sacrifice the first column
                     this.lightingData[rowPosition] = 0;
                 }
             }
