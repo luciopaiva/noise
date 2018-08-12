@@ -4,6 +4,9 @@ class App {
     static get MAX_THREADS() { return 8; }
 
     constructor() {
+        this.HALF_PI = Math.PI / 2;
+        this.TAU = Math.PI * 2;
+
         this.elevationData = [];
         this.lightingData = [];
 
@@ -20,7 +23,7 @@ class App {
         this.generateTerrainOnEvent(this.threadsElement, "input");
         this.generateTerrainOnEvent(this.octavesElement, "input");
         this.generateTerrainOnEvent(this.terrainModeElement, "input");
-        this.generateTerrainOnEvent(this.noisePointsElement, "input");
+        this.noisePointsElement.addEventListener("input", () => this.drawOnce());  // no need to regenerate terrain
         this.generateTerrainOnEvent(this.sunModeElement, "input");
         this.generateTerrainOnEvent(this.refreshButton, "click");
 
@@ -34,7 +37,7 @@ class App {
         this.isGeneratingTerrain = false;
         this.seaLevel = 0.5;  // ToDo this currently can't be changed without also manually changing the CSS color palette
         this.sunAngle = .65 * Math.PI;
-        this.sunStep = Math.PI / 30;  // each animation frame will step this many radians
+        this.sunStep = Math.PI / 60;  // each animation frame will step this many radians
         this.sunsetAngle = (5/4) * Math.PI;  // a bit after sunset actually
         this.sunriseAngle = -(1/4) * Math.PI;  // a bit before sunrise actually
 
@@ -95,9 +98,9 @@ class App {
 
         if (isTerrainMode) {
             const [r, g, b, a] = this.palette.color(noise);
-            buffer[bi    ] = Math.floor(r * lightingLevel);
-            buffer[bi + 1] = Math.floor(g * lightingLevel);
-            buffer[bi + 2] = Math.floor(b * lightingLevel);
+            buffer[bi    ] = ~~(r * lightingLevel);
+            buffer[bi + 1] = ~~(g * lightingLevel);
+            buffer[bi + 2] = ~~(b * lightingLevel);
             buffer[bi + 3] = a;
         } else {
             const channelValue = noise * 255;
@@ -231,43 +234,41 @@ class App {
         const a = new Vector(0, 0, 0);
         const b = new Vector(0, 0, 0);
         let rowPosition = 0;
-        let minLight = Number.POSITIVE_INFINITY;
-        let maxLight = Number.NEGATIVE_INFINITY;
-        for (let y = 0; y < this.canvas.height; y++) {
-            for (let x = 0; x < this.canvas.width; x++) {
-                let light = 1;
+
+        const height = this.canvas.height;
+        const width = this.canvas.width;
+
+        for (let y = 0; y < height; y++) {
+            // sacrifice lighting in the first column
+            this.lightingData[rowPosition] = 0;
+            let previousElevation = this.elevationData[rowPosition];
+
+            for (let x = 1; x < width; x++) {
                 const elevation = this.elevationData[rowPosition + x];
-                if (x > 0) {
-                    if (elevation > this.seaLevel) {
-                        // take the elevation next to us as reference to calculate our normal
-                        const previousElevation = this.elevationData[rowPosition + x - 1];
-                        a.set(0, previousElevation, 0);
-                        b.set(0.02, elevation, 0);  // x coord empirically determined for best results
-                        // the dot product will check how aligned with sun rays our normal is
-                        light = a.subtract(b).normalize().rotateZ(-Math.PI / 2).dot(sun);
-                        light = Math.max(0, light);  // negative values mean total darkness
 
-                        this.lightingData[rowPosition + x] = light;
+                if (elevation > this.seaLevel) {
+                    // take the elevation to our left as reference to calculate our normal
+                    a.set(0, previousElevation, 0);
+                    b.set(0.02, elevation, 0);  // x coord empirically determined for best results
+                    // the dot product will check how aligned with sun rays our normal is
+                    let light = a.subtract(b).normalize().rotateZ(-this.HALF_PI).dot(sun);
+                    light = Math.max(0, light);  // negative values mean total darkness
 
-                        if (light > maxLight) maxLight = light;
-                        if (light < minLight) minLight = light;
-                    } else {
-                        this.lightingData[rowPosition + x] = seaBrightness;
-                    }
+                    this.lightingData[rowPosition + x] = light;
                 } else {
-                    // sacrifice the first column
-                    this.lightingData[rowPosition] = 0;
+                    this.lightingData[rowPosition + x] = seaBrightness;
                 }
+
+                previousElevation = elevation;
             }
-            rowPosition += this.canvas.width;
+            rowPosition += width;
         }
-        console.info(`Surface light variation: ${minLight}, ${maxLight}`);
     }
 
     drawPoint(x, y) {
         const ctx = this.context;
         ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.arc(x, y, 3, 0, this.TAU);
         ctx.fill();
     }
 

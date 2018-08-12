@@ -17,7 +17,8 @@ class Palette {
     color(value) {
         const colorIndex = this.valueToColorIndex(value);
         const pos = colorIndex << 2;
-        return this.colors.slice(pos, pos + 4);
+        // do not use this.colors.slice() here; it slows down things a LOT:
+        return [this.colors[pos], this.colors[pos + 1], this.colors[pos + 2], this.colors[pos + 3]];
     }
 
     /**
@@ -65,7 +66,7 @@ class Palette {
      * @return {Number}
      */
     valueToColorIndex(value) {
-        return Math.floor(value * this.size)
+        return ~~(value * this.size)
     }
 
     static getCssPaletteColorProperty(i) {
